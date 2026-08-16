@@ -13,6 +13,8 @@ import {
   IconChevronUpOutline14,
   IconCodeOutline16,
   IconCordisPluginOutline14,
+  IconDownloadOutline16,
+  IconFolderOpen16,
   IconLinkOutline14,
   IconLoadingOutline16,
   IconQuestionOutline14,
@@ -254,6 +256,8 @@ export function MarketSection(props: MarketSectionProps) {
   const [webdavPassword, setWebdavPassword] = useState(initialWebdav.password)
   const [autoBackup, setAutoBackup] = useState(initialWebdav.auto)
   const bodyRef = useRef<HTMLDivElement | null>(null)
+  /** Hidden file input behind the Import button (a Button can't host an <input>). */
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [sortField, setSortField] = useState<SortField>('stars')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   /** Direction labels adapt to the field: stars → asc/desc, added → oldest/newest. */
@@ -474,6 +478,20 @@ export function MarketSection(props: MarketSectionProps) {
     setPage(1)
     scrollToTop()
   }
+
+  /** Download a host endpoint as a file — primitives Button can't be an <a download>. */
+  const downloadFile = useCallback((url: string, filename: string) => {
+    fetch(url)
+      .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.blob() })
+      .then(blob => {
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = filename
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+      })
+      .catch(error => setInstallError(String(error)))
+  }, [])
 
   const doInstall = useCallback((plugin: RegistryPlugin) => {
     setBuildsSkipped(null)
@@ -840,7 +858,13 @@ export function MarketSection(props: MarketSectionProps) {
             </div>
           </div>
           <span className={css.grow} />
-          <a className={css.src} href={p.url} target="_blank" rel="noreferrer" style={{ alignSelf: 'flex-start', flexShrink: 0 }}>{t('viewSource')}</a>
+          <Button
+            variant="outline"
+            size="sm"
+            className={css.srcBtn}
+            icon={<IconCodeOutline16 size={14} />}
+            onClick={() => window.open(p.url, '_blank', 'noopener')}
+          >{t('viewSource')}</Button>
         </div>
         <div className={css.desc}>{desc}</div>
         <div className={css.foot}>
@@ -910,7 +934,13 @@ export function MarketSection(props: MarketSectionProps) {
             </div>
           </div>
           <span className={css.grow} />
-          <a className={css.src} href={p.url} target="_blank" rel="noreferrer" style={{ alignSelf: 'flex-start', flexShrink: 0 }}>{t('viewSource')}</a>
+          <Button
+            variant="outline"
+            size="sm"
+            className={css.srcBtn}
+            icon={<IconCodeOutline16 size={14} />}
+            onClick={() => window.open(p.url, '_blank', 'noopener')}
+          >{t('viewSource')}</Button>
         </div>
         <div className={css.desc}>{desc}</div>
         <div className={css.foot}>
@@ -1009,8 +1039,14 @@ export function MarketSection(props: MarketSectionProps) {
           )}
         </div>
         <div className={css.sub}>
-          {t('subtitle') + (data ? ' · ' + data.count : '') + ' · '}
-          <a className={css.src} href="/dsh-market/logs" download="dsh-market-log.txt">{t('exportLog')}</a>
+          <span>{t('subtitle') + (data ? ' · ' + data.count : '')}</span>
+          <span className={css.grow} />
+          <Button
+            variant="outline"
+            size="sm"
+            icon={<IconDownloadOutline16 size={14} />}
+            onClick={() => downloadFile('/dsh-market/logs', 'dsh-market-log.txt')}
+          >{t('exportLog')}</Button>
         </div>
         <div className={css.tabs}>
           <button className={tab === 'discover' ? `${css.tab} ${css.on}` : css.tab} onClick={() => setTab('discover')}>{t('tabDiscover')}</button>
@@ -1138,20 +1174,34 @@ export function MarketSection(props: MarketSectionProps) {
                   <p>{t('backupHint')}</p>
                   <p className={css.backupWarn}>{t('credsWarning')}</p>
                   <div className={css.backupActions}>
-                    <a className={`${css.backupButton} ${css.backupPrimary}`} href="/dsh-market/backup" download aria-disabled={backupBusy}>{t('backupDownload')}</a>
-                    <label className={css.backupButton} aria-disabled={backupBusy}>
-                      {backupBusy ? t('backupWorking') : t('backupImport')}
-                      <input
-                        type="file"
-                        accept="application/json,.json"
-                        disabled={backupBusy}
-                        onChange={event => {
-                          const file = event.currentTarget.files?.[0]
-                          event.currentTarget.value = ''
-                          if (file !== undefined) file.text().then(text => previewBackup(JSON.parse(text))).catch(error => setBackupMessage(String(error)))
-                        }}
-                      />
-                    </label>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<IconDownloadOutline16 size={14} />}
+                      disabled={backupBusy}
+                      onClick={() => downloadFile('/dsh-market/backup', 'dsh-profile-backup.json')}
+                    >{backupBusy ? t('backupWorking') : t('backupDownload')}</Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={<IconFolderOpen16 size={14} />}
+                      disabled={backupBusy}
+                      onClick={() => fileInputRef.current?.click()}
+                    >{backupBusy ? t('backupWorking') : t('backupImport')}</Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className={css.hiddenFile}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      disabled={backupBusy}
+                      onChange={event => {
+                        const file = event.currentTarget.files?.[0]
+                        event.currentTarget.value = ''
+                        if (file !== undefined) file.text().then(text => previewBackup(JSON.parse(text))).catch(error => setBackupMessage(String(error)))
+                      }}
+                    />
                   </div>
                 </section>
                 <section className={css.backupCard}>
